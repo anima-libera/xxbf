@@ -152,43 +152,49 @@ impl Vm {
 	}
 
 	fn run_block(&mut self, block: &Block) {
-		//dbg!(&self);
-		//dbg!(&block);
-		match &block {
-			Block::BeginExecutionRaw => (),
-			Block::RawPlus => {
-				*self.get_mut_selected_cell() = self.get_mut_selected_cell().overflowing_add(1).0
-			}
-			Block::RawMinus => {
-				*self.get_mut_selected_cell() = self.get_mut_selected_cell().overflowing_sub(1).0
-			}
-			Block::RawLeft => {
-				assert!(self.selected_index >= 1);
-				self.selected_index -= 1;
-			}
-			Block::RawRight => {
-				self.selected_index += 1;
-			}
-			Block::RawDot => {
-				let c = *self.get_mut_selected_cell() as char;
-				self.output.push(c);
-			}
-			Block::RawComma => {
-				let c = *self.input.as_bytes().get(self.input_index).unwrap_or(&0);
-				self.input_index += 1;
-				*self.get_mut_selected_cell() = c;
-			}
-			Block::RawBracketLoop(sub_block) => {
-				while *self.get_mut_selected_cell() != 0 {
-					self.run_block(sub_block);
+		let mut block_stack: Vec<&Block> = vec![block];
+		loop {
+			let current_block = match block_stack.pop() {
+				Some(block) => block,
+				None => break,
+			};
+			match current_block {
+				Block::BeginExecutionRaw => (),
+				Block::RawPlus => {
+					*self.get_mut_selected_cell() =
+						self.get_mut_selected_cell().overflowing_add(1).0
 				}
-			}
-			Block::Sequence(block_vec) => {
-				for block in block_vec {
-					self.run_block(block)
+				Block::RawMinus => {
+					*self.get_mut_selected_cell() =
+						self.get_mut_selected_cell().overflowing_sub(1).0
 				}
+				Block::RawLeft => {
+					assert!(self.selected_index >= 1);
+					self.selected_index -= 1;
+				}
+				Block::RawRight => {
+					self.selected_index += 1;
+				}
+				Block::RawDot => {
+					let c = *self.get_mut_selected_cell() as char;
+					self.output.push(c);
+				}
+				Block::RawComma => {
+					let c = *self.input.as_bytes().get(self.input_index).unwrap_or(&0);
+					self.input_index += 1;
+					*self.get_mut_selected_cell() = c;
+				}
+				Block::RawBracketLoop(sub_block) => {
+					if *self.get_mut_selected_cell() != 0 {
+						block_stack.push(current_block);
+						block_stack.push(sub_block);
+					}
+				}
+				Block::Sequence(block_vec) => {
+					block_stack.extend(block_vec.iter().rev());
+				}
+				Block::EndExecutionRaw => (),
 			}
-			Block::EndExecutionRaw => (),
 		}
 	}
 }
@@ -210,6 +216,7 @@ fn main() {
 	
 	[Shows an ASCII representation of the Sierpinski triangle
 	(iteration 5).]";
+
 	let prog = parse(&String::from(SIERPINSKI), true).unwrap().prog;
 	dbg!(&prog);
 
