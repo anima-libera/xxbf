@@ -1,0 +1,32 @@
+
+Soup:
+	merging "+"/"-"/"<"/">" sequences into a soup that has
+		- cell deltas relative to the initial head
+		- the head delta
+
+Fixed Loop:
+	a loop of the type "["soup"]" with the soup having a null head delta
+	has nice properties, especially if the cell delta at the head is -1
+	and even more if the cell value at the head is known
+
+	loops such as "[-]" or "[->+++<]" can be really optimized
+
+Knowledge:
+	Start:
+		at the execution start, all cells are 0, and head is index 0
+	Right:
+		there is always be an endless stream of 0s if we go right enough
+		so for example the loop "[>]" always terminates without error
+	LoopEnd:
+		at the end of a loop, the cell value at the head is 0
+
+Using Knowledge:
+	example:
+		it would be really really cool to be able to optimize things like
+		"[[-]>][<]" into things like "[<] set end of dynamic buffer here+1"
+		(but it will probably be really hard to get there)
+
+
+
+TODO:
+	look at XLA tensorflow graph compiler
