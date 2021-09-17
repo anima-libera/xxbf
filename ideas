@@ -19,6 +19,8 @@ Knowledge:
 		so for example the loop "[>]" always terminates without error
 	LoopEnd:
 		at the end of a loop, the cell value at the head is 0
+	LoopStart:
+		at the beginning of a loop body, the cell value at the head is non-zero
 
 Using Knowledge:
 	example:

@@ -1,3 +1,94 @@
+fn parse_instr_seq(src_code: &str) -> Result<Vec<RawInstr>, Vec<ParsingError>> {
+	// A scope is either the whole program or a bracket loop and its content.
+	// Only the bottom scope isn't a bracket loop (and thus doesn't have an opening bracket pos),
+	// this bottom scope should always be there (such design is for convenience).
+	struct Scope {
+		opening_bracket_pos: Option<usize>,
+		instr_seq: Vec<RawInstr>,
+	}
+	struct ScopeStack(Vec<Scope>);
+	impl ScopeStack {
+		fn top_instr_seq(&mut self) -> &mut Vec<RawInstr> {
+			&mut self.0.last_mut().unwrap().instr_seq
+		}
+	}
+	let mut scope_stack: ScopeStack = ScopeStack(vec![Scope {
+		opening_bracket_pos: None,
+		instr_seq: Vec::new(),
+	}]);
+
+	let mut errors: Vec<ParsingError> = Vec::new();
+
+	for (pos, c) in src_code.char_indices() {
+		match c {
+			'+' => scope_stack.top_instr_seq().push(RawInstr::Plus),
+			'-' => scope_stack.top_instr_seq().push(RawInstr::Minus),
+			'<' => scope_stack.top_instr_seq().push(RawInstr::Left),
+			'>' => scope_stack.top_instr_seq().push(RawInstr::Right),
+			'.' => scope_stack.top_instr_seq().push(RawInstr::Dot),
+			',' => scope_stack.top_instr_seq().push(RawInstr::Comma),
+			'[' => scope_stack.0.push(Scope {
+				opening_bracket_pos: Some(pos),
+				instr_seq: Vec::new(),
+			}),
+			']' => {
+				if scope_stack.0.len() >= 2 {
+					let poped_instr_seq = scope_stack.0.pop().unwrap().instr_seq;
+					scope_stack
+						.top_instr_seq()
+						.push(RawInstr::BracketLoop(poped_instr_seq));
+				} else {
+					errors.push(ParsingError::UnmatchedClosingBracket { pos });
+				}
+			}
+			_ => (),
+		}
+	}
+
+	assert!(scope_stack.0.len() != 0);
+	while scope_stack.0.len() >= 2 {
+		// The use of `.remove(1)` here instead of `.pop().unwrap()` ensures that errors are
+		// sorted according to their `pos`.
+		let opening_bracket_pos = scope_stack.0.remove(1).opening_bracket_pos.unwrap();
+		errors.push(ParsingError::UnmatchedOpeningBracket {
+			pos: opening_bracket_pos,
+		});
+	}
+
+	if errors.is_empty() {
+		assert!(scope_stack.0.len() == 1);
+		Ok(scope_stack.0.pop().unwrap().instr_seq)
+	} else {
+		Err(errors)
+	}
+}
+
+#[derive(Debug)]
+enum ParsingError {
+	UnmatchedOpeningBracket { pos: usize },
+	UnmatchedClosingBracket { pos: usize },
+}
+
+#[derive(Debug)]
+struct RawProg {
+	instr_seq: Vec<RawInstr>,
+}
+#[derive(Debug)]
+enum RawInstr {
+	Plus,
+	Minus,
+	Left,
+	Right,
+	Dot,
+	Comma,
+	BracketLoop(Vec<RawInstr>),
+}
+
+fn main() {
+	dbg!(parse_instr_seq("+++[><.,[-]]-")).ok();
+}
+
+/*
 use std::collections::HashMap;
 
 type Prog = Vec<Block>;
@@ -665,3 +756,4 @@ fn main() {
 	emit_prog(&mut transpiled, &prog);
 	print!("{}", transpiled);
 }
+*/
