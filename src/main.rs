@@ -368,27 +368,33 @@ impl Settings {
 			what_to_do: WhatToDo::Interpret { input: None },
 		};
 		while let Some(arg) = args.next() {
-			if arg == "-s" {
+			if arg == "-s" || arg == "--src" {
 				settings.src = SrcSettings::Src(args.next().unwrap())
-			} else if arg == "-f" {
+			} else if arg == "-f" || arg == "--src-file" {
 				settings.src = SrcSettings::FilePath(args.next().unwrap())
-			} else if arg == "-c" {
+			} else if arg == "-c" || arg == "--compile" {
 				settings.what_to_do = WhatToDo::Compile {
 					target: CompileTarget::C,
 					dst_file_path: args.next(),
 				};
 			} else if let WhatToDo::Interpret { ref mut input } = settings.what_to_do {
-				if arg == "-i" {
+				if arg == "-i" || arg == "--input" {
 					*input = args.next();
+				} else {
+					panic!("unknown cmdline argument `{}` (for interpretation)", arg);
 				}
 			} else if let WhatToDo::Compile {
 				ref mut dst_file_path,
 				..
 			} = settings.what_to_do
 			{
-				if arg == "-o" {
+				if arg == "-o" || arg == "--output-file" {
 					*dst_file_path = args.next();
+				} else {
+					panic!("unknown cmdline argument `{}` (for compilation)", arg);
 				}
+			} else {
+				panic!("hhh");
 			}
 		}
 		settings
