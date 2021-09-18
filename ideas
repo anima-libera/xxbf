@@ -28,6 +28,13 @@ Using Knowledge:
 		"[[-]>][<]" into things like "[<] set end of dynamic buffer here+1"
 		(but it will probably be really hard to get there)
 
+Idiom-friendly knowledge:
+	maybe:
+		maybe represent the tape knowledge via things like
+		"[0 0 8 {non-zero} 0 (? iterations of [0 {non-zero}]) 0"
+		to be able to optimize progras with non-fixed loops
+		(which are used in a lot of cool programs!!)
+
 
 
 TODO:

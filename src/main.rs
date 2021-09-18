@@ -1,3 +1,14 @@
+#[derive(Debug, Clone)]
+enum RawInstr {
+	Plus,
+	Minus,
+	Left,
+	Right,
+	Dot,
+	Comma,
+	BracketLoop(Vec<RawInstr>),
+}
+
 fn parse_instr_seq(src_code: &str) -> Result<Vec<RawInstr>, Vec<ParsingError>> {
 	// A scope is either the whole program or a bracket loop and its content.
 	// Only the bottom scope isn't a bracket loop (and thus doesn't have an opening bracket pos),
@@ -69,23 +80,368 @@ enum ParsingError {
 	UnmatchedClosingBracket { pos: usize },
 }
 
-#[derive(Debug)]
-struct RawProg {
-	instr_seq: Vec<RawInstr>,
+impl ParsingError {
+	fn print(self, src_code: &str, src_code_name: Option<&str>, ansi_escape_codes: bool) {
+		let error_index = match self {
+			ParsingError::UnmatchedOpeningBracket { pos } => pos,
+			ParsingError::UnmatchedClosingBracket { pos } => pos,
+		};
+
+		// Find the line that contains the error.
+		let mut line_number = 1;
+		let mut line_start_index = 0;
+		let mut line_end_index = src_code.len() - 1;
+		let mut this_is_the_line = false;
+		for (index, c) in src_code.char_indices() {
+			if index == error_index {
+				this_is_the_line = true;
+			}
+			if c == '\n' {
+				if this_is_the_line {
+					line_end_index = index - 1;
+					break;
+				} else {
+					line_number += 1;
+					line_start_index = index + 1;
+					continue;
+				}
+			}
+		}
+		let line_number = line_number;
+		let line = &src_code[line_start_index..=line_end_index];
+		let inline_error_index = error_index - line_start_index;
+
+		let bold_on = if ansi_escape_codes { "\x1b[1m" } else { "" };
+		let bold_off = if ansi_escape_codes { "\x1b[22m" } else { "" };
+		let color_red = if ansi_escape_codes { "\x1b[31m" } else { "" };
+		let color_light_red = if ansi_escape_codes { "\x1b[91m" } else { "" };
+		let color_blue = if ansi_escape_codes { "\x1b[34m" } else { "" };
+		let color_cyan = if ansi_escape_codes { "\x1b[36m" } else { "" };
+		let color_off = if ansi_escape_codes { "\x1b[39m" } else { "" };
+
+		// Print the head line of the error message.
+		let error_variant_as_string = match self {
+			ParsingError::UnmatchedClosingBracket { pos: _ } => "Unmatched closing bracket",
+			ParsingError::UnmatchedOpeningBracket { pos: _ } => "Unmatched opening bracket",
+		};
+		println!(
+			"{}{}Parsing error{} on line {} column {}{}: {}{}",
+			bold_on,
+			color_red,
+			color_off,
+			line_number,
+			inline_error_index + 1,
+			match src_code_name {
+				Some(name) => format!(" of {}", name),
+				None => "".to_owned(),
+			},
+			error_variant_as_string,
+			bold_off
+		);
+
+		// Print the involved line of code with some formatting, and save the printed column of the
+		// error character to be able to print a carret exactly under it.
+		let mut initial_whitespace = true;
+		let mut carret_column = 0;
+		for (inline_index, c) in line.char_indices() {
+			// Skip initial whitespace.
+			if initial_whitespace && c.is_whitespace() {
+				continue;
+			} else {
+				initial_whitespace = false;
+			}
+
+			if c == '\t' {
+				// Make sure that tabs are manually extended to a fixed number of columns.
+				print!("    ");
+				if inline_index < inline_error_index {
+					carret_column += 4;
+				}
+			} else if inline_index == inline_error_index {
+				// Print the erroneous character with emphasis if possible.
+				print!(
+					"{}{}{}{}{}",
+					bold_on, color_light_red, c, color_off, bold_off
+				);
+			} else if matches!(c, '+' | '-' | '<' | '>' | '[' | ']' | '.' | ',')
+				|| c.is_whitespace()
+			{
+				// Print instruction characters normally.
+				print!("{}", c);
+				if inline_index < inline_error_index {
+					carret_column += 1;
+				}
+			} else {
+				// Print comment characters in a different way if possible.
+				print!("{}{}{}", color_blue, c, color_off);
+				if inline_index < inline_error_index {
+					carret_column += 1;
+				}
+			}
+		}
+		let carret_column = carret_column;
+
+		// Print a carret under the erroneous character.
+		println!("");
+		for _ in 0..carret_column {
+			print!(" ");
+		}
+		println!("{}{}^ here{}{}", bold_on, color_cyan, color_off, bold_off);
+	}
 }
-#[derive(Debug)]
-enum RawInstr {
-	Plus,
-	Minus,
-	Left,
-	Right,
-	Dot,
-	Comma,
-	BracketLoop(Vec<RawInstr>),
+
+struct TranspiledC {
+	code: String,
+	indent_level: u32,
+}
+
+impl TranspiledC {
+	fn new() -> TranspiledC {
+		TranspiledC {
+			code: String::new(),
+			indent_level: 0,
+		}
+	}
+
+	fn emit_line(&mut self, line_content: &str) {
+		self.code
+			.extend(std::iter::repeat("\t").take(self.indent_level as usize));
+		self.code.extend(line_content.chars());
+		self.code.extend("\n".chars());
+	}
+
+	fn emit_raw_instr_seq(&mut self, instr_seq: Vec<RawInstr>) {
+		for instr in instr_seq {
+			match instr {
+				RawInstr::Plus => self.emit_line("m[h]++;"),
+				RawInstr::Minus => self.emit_line("m[h]--;"),
+				RawInstr::Left => self.emit_line("h--;"),
+				RawInstr::Right => self.emit_line("h++;"),
+				RawInstr::Dot => self.emit_line("putchar(m[h]);"),
+				RawInstr::Comma => self.emit_line("m[h] = getchar();"),
+				RawInstr::BracketLoop(body) => {
+					self.emit_line("while (m[h])");
+					self.emit_line("{");
+					self.indent_level += 1;
+					self.emit_raw_instr_seq(body);
+					self.indent_level -= 1;
+					self.emit_line("}");
+				}
+			}
+		}
+	}
+}
+
+fn transpile_raw_to_c(instr_seq: Vec<RawInstr>) -> String {
+	let mut transpiled = TranspiledC::new();
+	transpiled.emit_line("#include <stdio.h>");
+	transpiled.emit_line("int main(void)");
+	transpiled.emit_line("{");
+	transpiled.indent_level += 1;
+	transpiled.emit_line("unsigned char m[30000] = {0};");
+	transpiled.emit_line("unsigned int h = 0;");
+	transpiled.emit_raw_instr_seq(instr_seq);
+	transpiled.emit_line("return 0;");
+	transpiled.indent_level -= 1;
+	transpiled.emit_line("}");
+	assert!(transpiled.indent_level == 0);
+	transpiled.code
+}
+
+struct VmMem {
+	cell_vec: Vec<u8>,
+	head: usize,
+	interact_with_user: bool,
+	input_stack: Vec<u8>,
+	output_stack: Vec<u8>,
+}
+
+impl VmMem {
+	fn new(input: Option<Vec<u8>>) -> VmMem {
+		VmMem {
+			cell_vec: Vec::new(),
+			head: 0,
+			interact_with_user: input.is_none(),
+			input_stack: input.map_or(Vec::new(), |v| {
+				v.into_iter().chain(std::iter::once(0)).rev().collect()
+			}),
+			output_stack: Vec::new(),
+		}
+	}
+
+	fn get(&self, index: usize) -> u8 {
+		self.cell_vec.get(index).copied().unwrap_or(0)
+	}
+
+	fn set(&mut self, index: usize, value: u8) {
+		let len = self.cell_vec.len();
+		if len <= index {
+			self.cell_vec
+				.extend(std::iter::repeat(0).take(index + 1 - len))
+		}
+		self.cell_vec[index] = value;
+	}
+}
+
+fn run_raw(instr_seq: Vec<RawInstr>, input: Option<Vec<u8>>) -> Vec<u8> {
+	let mut m = VmMem::new(input);
+	let mut instr_stack: Vec<RawInstr> = instr_seq.into_iter().rev().collect();
+	while let Some(instr) = instr_stack.pop() {
+		match &instr {
+			RawInstr::Plus => m.set(m.head, m.get(m.head).wrapping_add(1)),
+			RawInstr::Minus => m.set(m.head, m.get(m.head).wrapping_sub(1)),
+			RawInstr::Left => {
+				assert!(m.head >= 1);
+				m.head -= 1;
+			}
+			RawInstr::Right => m.head += 1,
+			RawInstr::Dot => {
+				let output_value = m.get(m.head);
+				if m.interact_with_user {
+					print!("{}", output_value as char);
+				}
+				m.output_stack.push(output_value);
+			}
+			RawInstr::Comma => {
+				let input_char_value = match m.input_stack.pop() {
+					Some(value) => value,
+					None => {
+						if m.interact_with_user {
+							let mut input_line = String::new();
+							std::io::stdin().read_line(&mut input_line).expect("h");
+							m.input_stack =
+								input_line.bytes().chain(std::iter::once(0)).rev().collect();
+							m.input_stack.pop().unwrap()
+						} else {
+							0
+						}
+					}
+				};
+				m.set(m.head, input_char_value);
+			}
+			RawInstr::BracketLoop(body) => {
+				if m.get(m.head) != 0 {
+					instr_stack.push(instr.clone());
+					instr_stack.extend(body.iter().rev().cloned());
+				}
+			}
+		}
+	}
+	if m.interact_with_user && m.output_stack.last().map_or(false, |&v| v != 10) {
+		println!("");
+	}
+	m.output_stack
+}
+
+enum WhatToDo {
+	Interpret {
+		input: Option<String>,
+	},
+	Compile {
+		target: CompileTarget,
+		dst_file_path: Option<String>,
+	},
+}
+
+enum CompileTarget {
+	C,
+}
+
+enum SrcSettings {
+	Src(String),
+	FilePath(String),
+	None,
+}
+
+struct Settings {
+	path: Option<String>,
+	src: SrcSettings,
+	what_to_do: WhatToDo,
+}
+
+impl Settings {
+	fn from_cmdline_args() -> Settings {
+		let mut args = std::env::args();
+		let mut settings = Settings {
+			path: args.next(),
+			src: SrcSettings::None,
+			what_to_do: WhatToDo::Interpret { input: None },
+		};
+		while let Some(arg) = args.next() {
+			if arg == "-s" {
+				settings.src = SrcSettings::Src(args.next().unwrap())
+			} else if arg == "-f" {
+				settings.src = SrcSettings::FilePath(args.next().unwrap())
+			} else if arg == "-c" {
+				settings.what_to_do = WhatToDo::Compile {
+					target: CompileTarget::C,
+					dst_file_path: args.next(),
+				};
+			} else if let WhatToDo::Interpret { ref mut input } = settings.what_to_do {
+				if arg == "-i" {
+					*input = args.next();
+				}
+			} else if let WhatToDo::Compile {
+				ref mut dst_file_path,
+				..
+			} = settings.what_to_do
+			{
+				if arg == "-o" {
+					*dst_file_path = args.next();
+				}
+			}
+		}
+		settings
+	}
 }
 
 fn main() {
-	dbg!(parse_instr_seq("+++[><.,[-]]-")).ok();
+	let settings = Settings::from_cmdline_args();
+
+	let src_code = match settings.src {
+		SrcSettings::Src(src_code) => src_code,
+		SrcSettings::FilePath(src_file_path) => std::fs::read_to_string(src_file_path).expect("h"),
+		SrcSettings::None => {
+			println!("No source code, nothing to do.");
+			return;
+		}
+	};
+
+	let parsing_result = parse_instr_seq(&src_code);
+	let prog = match parsing_result {
+		Ok(prog) => prog,
+		Err(error_vec) => {
+			for error in error_vec {
+				error.print(&src_code, None, true);
+			}
+			return;
+		}
+	};
+
+	match settings.what_to_do {
+		WhatToDo::Interpret { input } => {
+			let interact_with_user = input.is_some();
+			let input = input.map(|s| s.bytes().collect());
+			let output = run_raw(prog, input);
+			let output_string: String = output.iter().map(|&x| x as char).collect();
+			if interact_with_user {
+				println!("{}", output_string);
+			}
+		}
+		WhatToDo::Compile {
+			target,
+			dst_file_path,
+		} => {
+			let output_code = match target {
+				CompileTarget::C => transpile_raw_to_c(prog),
+			};
+			if let Some(dst_file_path) = dst_file_path {
+				std::fs::write(dst_file_path, output_code).expect("h");
+			} else {
+				print!("{}", output_code);
+			}
+		}
+	}
 }
 
 /*
