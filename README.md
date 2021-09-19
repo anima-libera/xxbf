@@ -16,12 +16,15 @@ Compiler and interpreter for the
     - Read some [Daniel Cristofani's programs](http://brainfuck.org/)
     - See the `ideas` file
 - Support different cell sizes and signed cells
-- Support ifferent options such as
+- Support different options such as
   - EOF is 0, EOF is -1, EOF does nothing
   - Fixed-size of dynamic tape
   - Behavior when underflowing to the left of the tape
   - Behavior when setting a cell to a value too small/big
+  - Comma can receive any byte or only "typable" ascii character values and EOF
   - etc.
+- Add test suite support
+- Add per-program and per-directory config (cmd line config overwrite these)
 - Support the `program!input` format
 - Add a debugger
   - Support the `#` breakpoint debugging instruction

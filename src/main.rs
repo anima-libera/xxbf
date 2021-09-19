@@ -1,4 +1,5 @@
 mod astraw;
+mod astsoup;
 mod ctranspiler;
 mod parser;
 mod vm;
