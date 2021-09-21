@@ -33,6 +33,7 @@ struct Settings {
 	help: bool,
 	verbose: bool,
 	src: SrcSettings,
+	optimize: bool,
 	what_to_do: WhatToDo,
 }
 
@@ -44,6 +45,7 @@ impl Settings {
 			help: false,
 			verbose: false,
 			src: SrcSettings::None,
+			optimize: true,
 			what_to_do: WhatToDo::Interpret { input: None },
 		};
 		while let Some(arg) = args.next() {
@@ -52,13 +54,15 @@ impl Settings {
 			} else if arg == "-v" || arg == "--verbose" {
 				settings.verbose = true;
 			} else if arg == "-s" || arg == "--src" {
-				settings.src = SrcSettings::Src(args.next().unwrap())
+				settings.src = SrcSettings::Src(args.next().unwrap());
 			} else if arg == "-f" || arg == "--src-file" {
-				settings.src = SrcSettings::FilePath(args.next().unwrap())
+				settings.src = SrcSettings::FilePath(args.next().unwrap());
+			} else if arg == "-O0" || arg == "--no-optimizations" {
+				settings.optimize = false;
 			} else if arg == "-c" || arg == "--compile" {
 				settings.what_to_do = WhatToDo::Compile {
 					target: CompileTarget::C,
-					dst_file_path: args.next(),
+					dst_file_path: None,
 				};
 			} else if let WhatToDo::Interpret { ref mut input } = settings.what_to_do {
 				if arg == "-i" || arg == "--input" {
@@ -84,6 +88,12 @@ impl Settings {
 	}
 }
 
+#[derive(Debug)]
+enum Prog {
+	Raw(Vec<astraw::RawInstr>),
+	Soup(Vec<astsoup::Block>),
+}
+
 fn main() {
 	let settings = Settings::from_cmdline_args();
 	if settings.verbose {
@@ -103,7 +113,7 @@ fn main() {
 	}
 
 	let parsing_result = parser::parse_instr_seq(&src_code);
-	let prog = match parsing_result {
+	let mut prog = Prog::Raw(match parsing_result {
 		Ok(prog) => prog,
 		Err(error_vec) => {
 			for error in error_vec {
@@ -111,16 +121,29 @@ fn main() {
 			}
 			return;
 		}
-	};
+	});
 	if settings.verbose {
 		dbg!(&prog);
+	}
+
+	if settings.optimize {
+		prog = Prog::Soup(astsoup::soupify(match prog {
+			Prog::Raw(ref raw_prog) => raw_prog,
+			_ => panic!("xxbf bug"),
+		}));
+		if settings.verbose {
+			dbg!(&prog);
+		}
 	}
 
 	match settings.what_to_do {
 		WhatToDo::Interpret { input } => {
 			let interact_with_user = input.is_some();
 			let input = input.map(|s| s.bytes().collect());
-			let output = vm::run_raw(prog, input);
+			let output = match prog {
+				Prog::Raw(raw_prog) => vm::run_raw(raw_prog, input),
+				Prog::Soup(soup_prog) => vm::run_soup(soup_prog, input),
+			};
 			let output_string: String = output.iter().map(|&x| x as char).collect();
 			if interact_with_user {
 				println!("{}", output_string);
@@ -131,7 +154,10 @@ fn main() {
 			dst_file_path,
 		} => {
 			let output_code = match target {
-				CompileTarget::C => ctranspiler::transpile_raw_to_c(prog),
+				CompileTarget::C => match prog {
+					Prog::Raw(raw_prog) => ctranspiler::transpile_raw_to_c(raw_prog),
+					Prog::Soup(soup_prog) => ctranspiler::transpile_soup_to_c(soup_prog),
+				},
 			};
 			if let Some(dst_file_path) = dst_file_path {
 				std::fs::write(dst_file_path, output_code).expect("h");
