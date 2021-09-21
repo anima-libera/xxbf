@@ -7,9 +7,8 @@ Compiler and interpreter for the
 ## TODO
 
 - Optimize
-  - Merge `+` `-` `<` `>` sequences into blocks
-  - Propagates compile-time knowledge to the right of the program
-  - Propagates information about which cells are used to the left
+  - Propagates compile-time knowledge forward in the program
+  - Propagates information about which cells are used backward in the program
   - Bruteforce `,` possibilities when it feels doable
     - Multithreading ?
   - Study brainfuck idioms to see what to optimize
