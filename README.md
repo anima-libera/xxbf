@@ -4,6 +4,19 @@
 Compiler and interpreter for the
 [Brainfuck](https://esolangs.org/wiki/Brainfuck) programming language.
 
+## CLI
+
+Cmdline arg | Parameter | Description
+----------- | --------- | -----------
+`-h` or `--help` | | Prints a help message.
+`-v` or `--verbose` | | Prints information maybe useful to debug.
+`-s` or `--src` | Brainfuck source code | Takes source code in the cmdline arguments.
+`-f` or `--src-file` | Brainfuck file path | Takes source code from the given file.
+`-O0` or `--no-optimizations` | | Disables optimizations.
+`-c` or `--compile` | | Compile instead of interpreting.
+`-i` or `--input` | String | When interpreting, read input from the given string instead of stdin.
+`-o` or `--output-file` | File path | When compiling, writes generated code to the given file instead of stdout.
+
 ## TODO
 
 - Optimize

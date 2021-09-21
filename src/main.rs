@@ -81,7 +81,7 @@ impl Settings {
 					panic!("unknown cmdline argument `{}` (for compilation)", arg);
 				}
 			} else {
-				panic!("hhh");
+				unreachable!();
 			}
 		}
 		settings
@@ -98,6 +98,9 @@ fn main() {
 	let settings = Settings::from_cmdline_args();
 	if settings.verbose {
 		dbg!(&settings);
+	}
+	if settings.help {
+		println!("Help comming soon.");
 	}
 
 	let src_code = match settings.src {
