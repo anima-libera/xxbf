@@ -83,8 +83,8 @@ pub fn soupify(raw_prog: &Vec<RawInstr>) -> Vec<SoupInstr> {
 					unreachable!()
 				}
 			}
-			RawInstr::Dot => soup_prog.push(SoupInstr::Output),
-			RawInstr::Comma => soup_prog.push(SoupInstr::Input),
+			RawInstr::Output => soup_prog.push(SoupInstr::Output),
+			RawInstr::Input => soup_prog.push(SoupInstr::Input),
 			RawInstr::BracketLoop(raw_instr_vec) => {
 				let body = soupify(raw_instr_vec);
 				if body.len() == 1 && matches!(body[0], SoupInstr::Soup { .. }) {

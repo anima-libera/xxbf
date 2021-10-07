@@ -27,8 +27,8 @@ pub fn parse_instr_seq(src_code: &str) -> Result<Vec<RawInstr>, Vec<ParsingError
 			'-' => scope_stack.top_instr_seq().push(RawInstr::Minus),
 			'<' => scope_stack.top_instr_seq().push(RawInstr::Left),
 			'>' => scope_stack.top_instr_seq().push(RawInstr::Right),
-			'.' => scope_stack.top_instr_seq().push(RawInstr::Dot),
-			',' => scope_stack.top_instr_seq().push(RawInstr::Comma),
+			'.' => scope_stack.top_instr_seq().push(RawInstr::Output),
+			',' => scope_stack.top_instr_seq().push(RawInstr::Input),
 			'[' => scope_stack.0.push(Scope {
 				opening_bracket_pos: Some(pos),
 				instr_seq: Vec::new(),
@@ -154,8 +154,8 @@ impl ParsingError {
 					"{}{}{}{}{}",
 					bold_on, color_light_red, c, color_off, bold_off
 				);
-			} else if matches!(c, '+' | '-' | '<' | '>' | '[' | ']' | '.' | ',')
-				|| c.is_whitespace()
+			} else if matches!(c, '+' | '-' | '<' | '>' | '[' | ']' | '.' | ',') ||
+				c.is_whitespace()
 			{
 				// Print instruction characters normally.
 				print!("{}", c);

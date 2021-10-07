@@ -54,8 +54,8 @@ impl TranspiledC {
 				RawInstr::Minus => self.emit_line("m[h]--;"),
 				RawInstr::Left => self.emit_line("h--;"),
 				RawInstr::Right => self.emit_line("h++;"),
-				RawInstr::Dot => self.emit_line("putchar(m[h]);"),
-				RawInstr::Comma => self.emit_line("m[h] = getchar();"),
+				RawInstr::Output => self.emit_line("putchar(m[h]);"),
+				RawInstr::Input => self.emit_line("m[h] = getchar();"),
 				RawInstr::BracketLoop(body) => {
 					self.emit_line("while (m[h])");
 					self.emit_line("{");

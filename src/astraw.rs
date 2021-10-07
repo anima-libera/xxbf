@@ -4,7 +4,7 @@ pub enum RawInstr {
 	Minus,
 	Left,
 	Right,
-	Dot,
-	Comma,
+	Output,
+	Input,
 	BracketLoop(Vec<RawInstr>),
 }
