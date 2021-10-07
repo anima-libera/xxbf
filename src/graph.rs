@@ -1,6 +1,5 @@
-
-use std::collections::HashMap;
 use crate::astsoup::SoupInstr;
+use std::collections::HashMap;
 
 enum BlockInstr {
 	Soup {
@@ -27,7 +26,10 @@ type BlockId = u64;
 
 enum Terminator {
 	Goto(BlockId),
-	Branch { if_zero: BlockId, if_non_zero: BlockId },
+	Branch {
+		if_zero: BlockId,
+		if_non_zero: BlockId,
+	},
 }
 
 struct Block {

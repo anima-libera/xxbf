@@ -81,11 +81,11 @@ pub fn run_raw(instr_seq: Vec<RawInstr>, input: Option<Vec<u8>>) -> Vec<u8> {
 				m.head -= 1;
 			}
 			RawInstr::Right => m.head += 1,
-			RawInstr::Dot => {
+			RawInstr::Output => {
 				let char_value = m.get(m.head);
 				m.output_char_value(char_value);
 			}
-			RawInstr::Comma => {
+			RawInstr::Input => {
 				let char_value = m.input_char_value();
 				m.set(m.head, char_value);
 			}
