@@ -1,7 +1,8 @@
 use crate::astraw::RawInstr;
 use std::collections::HashMap;
-use std::collections::HashSet;
+//use std::collections::HashSet;
 
+/*
 enum CellInfoForward {
 	Value(u8),
 	ValueSet(HashSet<u8>),
@@ -27,9 +28,10 @@ struct TapeInfoForward {
 	tape_slice_vec: Vec<TapeSliceInfoForward>,
 	head: usize,
 }
+*/
 
 #[derive(Debug, Clone)]
-pub enum Block {
+pub enum SoupInstr {
 	Soup {
 		cell_deltas: HashMap<isize, isize>,
 		head_delta: isize,
@@ -47,14 +49,14 @@ pub enum Block {
 		cell_deltas: HashMap<isize, isize>,
 		head_delta: isize,
 	},
-	Loop(Vec<Block>),
+	Loop(Vec<SoupInstr>),
 }
 
-pub fn soupify(raw_prog: &Vec<RawInstr>) -> Vec<Block> {
-	let mut soup_prog: Vec<Block> = Vec::new();
-	fn top_must_be_soup(soup_prog: &mut Vec<Block>) {
-		if !matches!(soup_prog.last(), Some(Block::Soup { .. })) {
-			soup_prog.push(Block::Soup {
+pub fn soupify(raw_prog: &Vec<RawInstr>) -> Vec<SoupInstr> {
+	let mut soup_prog: Vec<SoupInstr> = Vec::new();
+	fn top_must_be_soup(soup_prog: &mut Vec<SoupInstr>) {
+		if !matches!(soup_prog.last(), Some(SoupInstr::Soup { .. })) {
+			soup_prog.push(SoupInstr::Soup {
 				cell_deltas: HashMap::new(),
 				head_delta: 0,
 			});
@@ -65,7 +67,7 @@ pub fn soupify(raw_prog: &Vec<RawInstr>) -> Vec<Block> {
 		match raw_instr {
 			RawInstr::Plus | RawInstr::Minus | RawInstr::Left | RawInstr::Right => {
 				top_must_be_soup(&mut soup_prog);
-				if let Some(&mut Block::Soup {
+				if let Some(&mut SoupInstr::Soup {
 					ref mut cell_deltas,
 					ref mut head_delta,
 				}) = soup_prog.last_mut()
@@ -81,26 +83,26 @@ pub fn soupify(raw_prog: &Vec<RawInstr>) -> Vec<Block> {
 					unreachable!()
 				}
 			}
-			RawInstr::Dot => soup_prog.push(Block::Output),
-			RawInstr::Comma => soup_prog.push(Block::Input),
+			RawInstr::Dot => soup_prog.push(SoupInstr::Output),
+			RawInstr::Comma => soup_prog.push(SoupInstr::Input),
 			RawInstr::BracketLoop(raw_instr_vec) => {
 				let body = soupify(raw_instr_vec);
-				if body.len() == 1 && matches!(body[0], Block::Soup { .. }) {
+				if body.len() == 1 && matches!(body[0], SoupInstr::Soup { .. }) {
 					match &body[0] {
-						Block::Soup {
+						SoupInstr::Soup {
 							cell_deltas,
 							head_delta,
 						} => {
 							if *head_delta == 0 && *cell_deltas.get(&0).unwrap_or(&0) == -1 {
-								soup_prog.push(Block::MultFixedLoop {
+								soup_prog.push(SoupInstr::MultFixedLoop {
 									cell_deltas: cell_deltas.clone(),
 								});
 							} else if *head_delta == 0 {
-								soup_prog.push(Block::SoupFixedLoop {
+								soup_prog.push(SoupInstr::SoupFixedLoop {
 									cell_deltas: cell_deltas.clone(),
 								});
 							} else {
-								soup_prog.push(Block::SoupMovingLoop {
+								soup_prog.push(SoupInstr::SoupMovingLoop {
 									cell_deltas: cell_deltas.clone(),
 									head_delta: *head_delta,
 								});
@@ -109,7 +111,7 @@ pub fn soupify(raw_prog: &Vec<RawInstr>) -> Vec<Block> {
 						_ => unreachable!(),
 					}
 				} else {
-					soup_prog.push(Block::Loop(body));
+					soup_prog.push(SoupInstr::Loop(body));
 				}
 			}
 		}

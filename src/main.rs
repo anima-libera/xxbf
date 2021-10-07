@@ -1,3 +1,4 @@
+mod graph;
 mod astraw;
 mod astsoup;
 mod ctranspiler;
@@ -91,7 +92,7 @@ impl Settings {
 #[derive(Debug)]
 enum Prog {
 	Raw(Vec<astraw::RawInstr>),
-	Soup(Vec<astsoup::Block>),
+	Soup(Vec<astsoup::SoupInstr>),
 }
 
 fn main() {

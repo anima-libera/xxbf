@@ -1,5 +1,5 @@
 use crate::astraw::RawInstr;
-use crate::astsoup::Block;
+use crate::astsoup::SoupInstr;
 use std::io::{Read, Write};
 
 struct VmMem {
@@ -104,12 +104,12 @@ pub fn run_raw(instr_seq: Vec<RawInstr>, input: Option<Vec<u8>>) -> Vec<u8> {
 	m.output_stack
 }
 
-pub fn run_soup(instr_seq: Vec<Block>, input: Option<Vec<u8>>) -> Vec<u8> {
+pub fn run_soup(instr_seq: Vec<SoupInstr>, input: Option<Vec<u8>>) -> Vec<u8> {
 	let mut m = VmMem::new(input);
-	let mut instr_stack: Vec<Block> = instr_seq.into_iter().rev().collect();
+	let mut instr_stack: Vec<SoupInstr> = instr_seq.into_iter().rev().collect();
 	while let Some(instr) = instr_stack.pop() {
 		match &instr {
-			Block::Soup {
+			SoupInstr::Soup {
 				cell_deltas,
 				head_delta,
 			} => {
@@ -121,15 +121,15 @@ pub fn run_soup(instr_seq: Vec<Block>, input: Option<Vec<u8>>) -> Vec<u8> {
 				}
 				m.head = (m.head as isize + head_delta) as usize;
 			}
-			Block::Output => {
+			SoupInstr::Output => {
 				let char_value = m.get(m.head);
 				m.output_char_value(char_value);
 			}
-			Block::Input => {
+			SoupInstr::Input => {
 				let char_value = m.input_char_value();
 				m.set(m.head, char_value);
 			}
-			Block::MultFixedLoop { cell_deltas } => {
+			SoupInstr::MultFixedLoop { cell_deltas } => {
 				assert!(matches!(cell_deltas.get(&0), Some(-1)));
 				let n = m.get(m.head) as isize;
 				for (relative_head, delta) in cell_deltas.iter() {
@@ -140,7 +140,7 @@ pub fn run_soup(instr_seq: Vec<Block>, input: Option<Vec<u8>>) -> Vec<u8> {
 				}
 				m.set(m.head, 0);
 			}
-			Block::SoupFixedLoop { cell_deltas } => {
+			SoupInstr::SoupFixedLoop { cell_deltas } => {
 				for (relative_head, delta) in cell_deltas.iter() {
 					let index = (m.head as isize + relative_head) as usize;
 					let old_value: isize = m.get(index) as isize;
@@ -151,7 +151,7 @@ pub fn run_soup(instr_seq: Vec<Block>, input: Option<Vec<u8>>) -> Vec<u8> {
 					instr_stack.push(instr.clone());
 				}
 			}
-			Block::SoupMovingLoop {
+			SoupInstr::SoupMovingLoop {
 				cell_deltas,
 				head_delta,
 			} => {
@@ -166,7 +166,7 @@ pub fn run_soup(instr_seq: Vec<Block>, input: Option<Vec<u8>>) -> Vec<u8> {
 					instr_stack.push(instr.clone());
 				}
 			}
-			Block::Loop(body) => {
+			SoupInstr::Loop(body) => {
 				if m.get(m.head) != 0 {
 					// The loop itself must be under its content.
 					instr_stack.push(instr.clone());

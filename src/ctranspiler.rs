@@ -1,5 +1,5 @@
 use crate::astraw::RawInstr;
-use crate::astsoup::Block;
+use crate::astsoup::SoupInstr;
 use std::collections::HashMap;
 
 struct TranspiledC {
@@ -68,10 +68,10 @@ impl TranspiledC {
 		}
 	}
 
-	fn emit_soup_instr_seq(&mut self, instr_seq: Vec<Block>) {
+	fn emit_soup_instr_seq(&mut self, instr_seq: Vec<SoupInstr>) {
 		for instr in instr_seq {
 			match instr {
-				Block::Soup {
+				SoupInstr::Soup {
 					cell_deltas,
 					head_delta,
 				} => {
@@ -83,9 +83,9 @@ impl TranspiledC {
 						self.emit_line(&format!("h += {};", head_delta));
 					}
 				}
-				Block::Output => self.emit_line("putchar(m[h]);"),
-				Block::Input => self.emit_line("m[h] = getchar();"),
-				Block::MultFixedLoop { cell_deltas } => {
+				SoupInstr::Output => self.emit_line("putchar(m[h]);"),
+				SoupInstr::Input => self.emit_line("m[h] = getchar();"),
+				SoupInstr::MultFixedLoop { cell_deltas } => {
 					assert!(matches!(cell_deltas.get(&0), Some(-1)));
 					let cell_deltas = sort_cell_deltas(cell_deltas);
 					for (relative_head, delta) in cell_deltas.iter() {
@@ -96,7 +96,7 @@ impl TranspiledC {
 					}
 					self.emit_line(&format!("m[h] = 0;"));
 				}
-				Block::SoupFixedLoop { cell_deltas } => {
+				SoupInstr::SoupFixedLoop { cell_deltas } => {
 					self.emit_line("while (m[h])");
 					self.emit_line("{");
 					self.emit_indent();
@@ -107,7 +107,7 @@ impl TranspiledC {
 					self.emit_unindent();
 					self.emit_line("}");
 				}
-				Block::SoupMovingLoop {
+				SoupInstr::SoupMovingLoop {
 					cell_deltas,
 					head_delta,
 				} => {
@@ -122,7 +122,7 @@ impl TranspiledC {
 					self.emit_unindent();
 					self.emit_line("}");
 				}
-				Block::Loop(body) => {
+				SoupInstr::Loop(body) => {
 					self.emit_line("while (m[h])");
 					self.emit_line("{");
 					self.emit_indent();
@@ -143,7 +143,7 @@ pub fn transpile_raw_to_c(instr_seq: Vec<RawInstr>) -> String {
 	transpiled.code
 }
 
-pub fn transpile_soup_to_c(instr_seq: Vec<Block>) -> String {
+pub fn transpile_soup_to_c(instr_seq: Vec<SoupInstr>) -> String {
 	let mut transpiled = TranspiledC::new();
 	transpiled.emit_header();
 	transpiled.emit_soup_instr_seq(instr_seq);
